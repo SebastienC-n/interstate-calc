@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loan Payment Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Loan Payment Calculator</h1>
+        <form id="payment-form">
+            <label for="principal">Amount From Lender ($):</label>
+            <input type="number" id="principal" name="principal" required><br>
+            
+            <label for="rate">Annual Interest Rate (%):</label>
+            <input type="number" id="rate" name="rate" step="0.01" required><br>
+            
+            <label for="start-date">Loan Start Date:</label>
+            <input type="date" id="start-date" name="start-date" required><br>
+            
+            <label for="end-date">Loan End Date:</label>
+            <input type="date" id="end-date" name="end-date" required><br>
+            
+            <label for="interest-type">Interest Type:</label>
+            <select id="interest-type" name="interest-type" onchange="toggleInterestOptions()">
+                <option value="simple">Simple Interest</option>
+                <option value="compound">Compound Interest</option>
+                <option value="variable">Variable Interest</option>
+            </select><br>
+            
+            <div id="compound-options" style="display:none;">
+                <label for="compounding-frequency">Compounding Frequency:</label>
+                <select id="compounding-frequency" name="compounding-frequency">
+                    <option value="daily">Daily</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="annually">Annually</option>
+                </select><br>
+            </div>
+            
+            <div id="variable-options" style="display:none;">
+                <h3>Variable Interest Rates</h3>
+                <div id="rates-container">
+                    <!-- Dynamic rate inputs will be added here -->
+                </div>
+                <button type="button" onclick="addRateField()">Add Interest Rate</button><br><br>
+            </div>
+
+            <h3>Separate Payments (Optional)</h3>
+            <div id="payments-container">
+                <!-- Dynamic payment inputs will be added here -->
+            </div>
+            <button type="button" onclick="addPaymentField()">Add Payment</button><br><br>
+            
+            <button type="button" onclick="calculateMonthlyPayments()">Calculate Monthly Payments</button>
+        </form>
+
+        <div class="result" id="result">
+            <!-- Results will be displayed here -->
+        </div>
+    </div>
+
+    <script>
+        let paymentCount = 0;
+        let rateCount = 0;
+
+        function addPaymentField() {
+            paymentCount++;
+            const container = document.getElementById('payments-container');
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <h4>Payment ${paymentCount}</h4>
+                <label for="payment-${paymentCount}-amount">Payment Amount ($):</label>
+                <input type="number" id="payment-${paymentCount}-amount" name="payment-${paymentCount}-amount"><br>
+                
+                <label for="payment-${paymentCount}-start">Start Date:</label>
+                <input type="date" id="payment-${paymentCount}-start" name="payment-${paymentCount}-start"><br>
+                
+                <label for="payment-${paymentCount}-end">End Date:</label>
+                <input type="date" id="payment-${paymentCount}-end" name="payment-${paymentCount}-end"><br><br>
+            `;
+            container.appendChild(div);
+        }
+
+        function addRateField() {
+            rateCount++;
+            const container = document.getElementById('rates-container');
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <h4>Rate ${rateCount}</h4>
+                <label for="rate-${rateCount}-amount">Interest Rate (%):</label>
+                <input type="number" id="rate-${rateCount}-amount" name="rate-${rateCount}-amount" step="0.01"><br>
+                
+                <label for="rate-${rateCount}-start">Start Date:</label>
+                <input type="date" id="rate-${rateCount}-start" name="rate-${rateCount}-start"><br>
+                
+                <label for="rate-${rateCount}-end">End Date:</label>
+                <input type="date" id="rate-${rateCount}-end" name="rate-${rateCount}-end"><br><br>
+            `;
+            container.appendChild(div);
+        }
+
+        function toggleInterestOptions() {
+            const interestType = document.getElementById('interest-type').value;
+            document.getElementById('compound-options').style.display = (interestType === 'compound') ? 'block' : 'none';
+            document.getElementById('variable-options').style.display = (interestType === 'variable') ? 'block' : 'none';
+        }
+
+        function calculateMonthlyPayments() {
+            let principal = parseFloat(document.getElementById('principal').value);
+            let annualRate = parseFloat(document.getElementById('rate').value) / 100;
+            let loanStartDate = new Date(document.getElementById('start-date').value);
+            let loanEndDate = new Date(document.getElementById('end-date').value);
+            let interestType = document.getElementById('interest-type').value;
+
+            if (isNaN(principal) || isNaN(annualRate) || principal <= 0 || annualRate <= 0 || loanEndDate <= loanStartDate) {
+                alert("Please enter valid positive numbers for all fields and ensure the end date is after the start date.");
+                return;
+            }
+
+            let results = '';
+            let totalLoanPayment = 0;
+            let totalMonths = getMonthDifference(loanStartDate, loanEndDate);
+            
+            if (totalMonths > 0) {
+                let hasSeparatePayments = false;
+
+                for (let i = 1; i <= paymentCount; i++) {
+                    let amount = parseFloat(document.getElementById(`payment-${i}-amount`).value) || 0;
+                    let startDate = new Date(document.getElementById(`payment-${i}-start`).value);
+                    let endDate = new Date(document.getElementById(`payment-${i}-end`).value);
+
+                    if (!isNaN(amount) && startDate && endDate && amount > 0 && endDate > startDate) {
+                        let periodMonths = getMonthDifference(startDate, endDate);
+                        let monthlyPayment = calculateMonthlyPaymentForPeriod(amount, principal, annualRate, periodMonths, interestType);
+                        
+                        results += `
+                            <h4>Payment ${i}</h4>
+                            <p><strong>Payment Amount:</strong> $${amount.toFixed(2)}</p>
+                            <p><strong>Monthly Payment (Interest Included):</strong> $${monthlyPayment.toFixed(2)}</p>
+                            <p><strong>Period:</strong> ${formatDate(startDate)} to ${formatDate(endDate)}</p><br>
+                        `;
+                        hasSeparatePayments = true;
+                    }
+                }
+
+                if (!hasSeparatePayments) {
+                    let monthlyPayment = calculateConstantMonthlyPayment(principal, annualRate, totalMonths, interestType);
+                    let finalPayment = monthlyPayment * totalMonths;
+                    results += `
+                        <h4>Loan Payment Details</h4>
+                        <p><strong>Total Loan Duration:</strong> ${totalMonths} months</p>
+                        <p><strong>Monthly Payment (Interest Included):</strong> $${monthlyPayment.toFixed(2)}</p>
+                        <p><strong>Total Final Payment:</strong> $${finalPayment.toFixed(2)}</p>
+                    `;
+                }
+            } else {
+                alert("The duration between the start and end dates must be positive.");
+            }
+
+            document.getElementById('result').innerHTML = results;
+        }
+
+        function getMonthDifference(startDate, endDate) {
+            let months = (endDate.getFullYear() - startDate.getFullYear()) * 12;
+            months -= startDate.getMonth();
+            months += endDate.getMonth();
+            return months <= 0 ? 0 : months + 1; // Added +1 to include the end month
+        }
+
+        function calculateMonthlyPaymentForPeriod(amount, principal, rate, totalMonths, interestType) {
+            if (interestType === 'compound') {
+                return calculateCompoundMonthlyPayment(principal, rate, totalMonths);
+            } else if (interestType === 'variable') {
+                return calculateVariableMonthlyPayment(principal, rate, totalMonths);
+            } else {
+                return amount;
+            }
+        }
+
+        function calculateCompoundMonthlyPayment(principal, rate, totalMonths) {
+            let monthlyRate = rate / 12;
+            let compoundingFrequency = document.getElementById('compounding-frequency').value;
+            let n = compoundingFrequency === 'daily' ? 365 : (compoundingFrequency === 'monthly' ? 12 : 1);
+            let compoundRate = Math.pow(1 + (rate / n), n) - 1;
+            return principal * (compoundRate + (compoundRate / (Math.pow(1 + compoundRate, totalMonths) - 1)));
+        }
+
+        function calculateVariableMonthlyPayment(principal, rate, totalMonths) {
+            let totalPayment = 0;
+            for (let i = 1; i <= rateCount; i++) {
+                let rateAmount = parseFloat(document.getElementById(`rate-${i}-amount`).value) || 0;
+                let startDate = new Date(document.getElementById(`rate-${i}-start`).value);
+                let endDate = new Date(document.getElementById(`rate-${i}-end`).value);
+                let periodMonths = getMonthDifference(startDate, endDate);
+
+                if (rateAmount > 0 && endDate > startDate && periodMonths > 0) {
+                    let monthlyRate = rateAmount / 100 / 12;
+                    totalPayment += principal * (monthlyRate + (monthlyRate / (Math.pow(1 + monthlyRate, periodMonths) - 1)));
+                }
+            }
+            return totalPayment / totalMonths;
+        }
+
+        function calculateConstantMonthlyPayment(principal, rate, totalMonths, interestType) {
+            if (interestType === 'compound') {
+                return calculateCompoundMonthlyPayment(principal, rate, totalMonths);
+            } else {
+                let monthlyRate = rate / 12;
+                return principal * (monthlyRate + (monthlyRate / (Math.pow(1 + monthlyRate, totalMonths) - 1)));
+            }
+        }
+
+        function formatDate(date) {
+            return `${date.getFullYear()}-${('0' + (date.getMonth() + 1)).slice(-2)}-${('0' + date.getDate()).slice(-2)}`;
+        }
+    </script>
+</body>
+</html>
